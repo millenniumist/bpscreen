@@ -1,0 +1,21 @@
+[Unit]
+Description=Parking Fee Monitor Server and Chromium Browser
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/node /opt/blueparking-pos/parkingfee-screen/server.js
+ExecStartPost=/opt/blueparking-pos/parkingfee-screen/chromium-browser.sh
+Restart=on-failure
+RestartSec=10
+LimitNOFILE=1024
+MemoryMax=500M
+CPUQuota=50%
+WorkingDirectory=/opt/blueparking-pos/parkingfee-screen
+StandardOutput=journal
+StandardError=inherit
+Environment=NODE_PORT=13030
+Environment=DISPLAY=:0
+Environment=XAUTHORITY=/home/blueparking/.Xauthority
+
+[Install]
+WantedBy=default.target

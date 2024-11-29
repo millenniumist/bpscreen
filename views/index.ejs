@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>BLUE PARKING | Parking Fee</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="#" href="#" />
+    <style>
+        body, h1 { font-family: "Sarabun", sans-serif }
+        body, html { height: 100%; width: 100%; }
+        html{ box-sizing: border-box; }*,*:before,*:after{ box-sizing: inherit; }
+        html{ -ms-text-size-adjust: 100%; -webkit-text-size-adjust: 100%; }
+        body{ margin:0; }
+        .display-container {position:relative; min-height: 100%; background-color: #000; background-position: center; background-size: cover; }
+        .text-white { color: #fff; }
+        .display-middle { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); -ms-transform:translate(-50%,-50%); }
+        .centered { text-align:center; }
+        .text-size-small { font-size: 1.3rem!important; }
+        .text-size-large { font-size: 4rem!important; }
+        .text-size-xlarge { font-size: 6.7rem!important; }
+        .text-size-xxlarge { font-size: 15rem!important; }
+        .text-size-jumbo { font-size: 17rem!important; }
+        .font-italic { font-style: italic!important; }
+        .mt-1 { margin-top: 1rem!important; }
+        .mb-1 { margin-bottom: 1rem!important; }
+        .mb-3 { margin-bottom: 3rem!important; }
+        .minwidth-850 { min-width: 850px; }
+        .minwidth-900 { min-width: 900px; }
+        .show { display: block!important; }
+        .hide { display: none!important; }
+    </style>
+</head>
+<body>
+    <div class="display-container text-white minwidth-900">
+        <div class="display-middle minwidth-850">
+            <div class="clock-container">
+                <h1 id="clock" class="text-size-xxlarge centered"></h1>
+            </div>
+            <div class="charges-container hide">
+                <div id="plateInfo" class="hide">
+                    <h1 class="text-size-small font-italic">ป้ายทะเบียน : </h1>
+                    <h1 class="text-size-large mt-1 mb-1 centered" id="displayPlateLine1"><%= displayPlateLine1 %></h1>
+                    <h1 class="text-size-large mt-1 mb-3 centered" id="displayPlateLine2"><%= displayPlateLine2 %></h1>
+                </div>
+                <div id="noPlateInfo" class="show">
+                    <h1 class="text-size-large mt-1 mb-3 centered">ไม่พบป้ายทะเบียน</h1>
+                </div>
+                <h1 class="text-size-small font-italic">ค่าบริการ (บาท) : </h1>
+                <h1 class="text-size-jumbo mt-1 mb-1 centered" id="displayFeeLine1">0</h1>
+            </div>
+            <div class="thankyou-container hide">
+                <h1 id="clock" class="text-size-xlarge centered">ขอบคุณที่ใช้บริการ</h1>
+            </div>
+        </div>
+    </div>
+    <script type="application/javascript">
+        document.addEventListener('DOMContentLoaded', function() {
+            const displayPlateLine1 = document.getElementById('displayPlateLine1');
+            const displayPlateLine2 = document.getElementById('displayPlateLine2');
+            const displayFeeLine1 = document.getElementById('displayFeeLine1');
+            const plateInfoDiv = document.getElementById('plateInfo');
+            const noPlateInfoDiv = document.getElementById('noPlateInfo');
+            const chargesContainerDivs = document.getElementsByClassName('charges-container');
+            const thankYouContainerDivs = document.getElementsByClassName('thankyou-container');
+            const clockContainerDivs = document.getElementsByClassName('clock-container');
+            let clockInterval;
+            let evtSource;
+
+            const hideElements = (elements) => Array.from(elements).forEach(elem => elem.classList.add('hide'));
+            const showElements = (elements) => Array.from(elements).forEach(elem => elem.classList.remove('hide'));
+
+            const togglePlateInfo = (shouldShow) => {
+                plateInfoDiv.className = shouldShow ? 'show' : 'hide';
+                noPlateInfoDiv.className = shouldShow ? 'hide' : 'show';
+            };
+
+            const toggleDisplay = (viewMode) => {
+                hideElements(chargesContainerDivs);
+                hideElements(thankYouContainerDivs);
+                hideElements(clockContainerDivs);
+
+                switch(viewMode) {
+                    case 'CHARGE': showElements(chargesContainerDivs); break;
+                    case 'THANK_YOU': showElements(thankYouContainerDivs); break;
+                    case 'CLOCK': showElements(clockContainerDivs); break;
+                }
+            };
+
+            const updateClock = () => {
+                const now = new Date();
+                const utcTime = now.getTime() + now.getTimezoneOffset() * 60000; // Convert to UTC
+                const bangkokTime = new Date(utcTime + (3600000 * 7)); // UTC + 7 hours for Bangkok
+
+                const hours = String(bangkokTime.getHours()).padStart(2, '0');
+                const minutes = String(bangkokTime.getMinutes()).padStart(2, '0');
+                const seconds = String(bangkokTime.getSeconds()).padStart(2, '0');
+
+                document.getElementById('clock').textContent = `${hours}:${minutes}:${seconds}`;
+            }
+
+            const startClock = () => {
+                if (!clockInterval) {
+                    updateClock();
+                    clockInterval = setInterval(updateClock, 1000);
+                }
+            };
+
+            const stopClock = () => {
+                if (clockInterval) {
+                    clearInterval(clockInterval);
+                    clockInterval = null;
+                }
+            };
+
+            const connectSSE = () => {
+                if (evtSource) evtSource.close();
+                evtSource = new EventSource('/events');
+
+                evtSource.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        const isPlateInfoComplete = data.plateLetter && data.plateNumber && data.plateProvince;
+
+                        displayPlateLine1.innerText = isPlateInfoComplete ? `${data.plateLetter} - ${data.plateNumber}` : "";
+                        displayPlateLine2.innerText = isPlateInfoComplete ? data.plateProvince : "";
+                        displayFeeLine1.innerText = isPlateInfoComplete ? data.amount : "0.0";
+
+                        if (data.viewMode === "CLOCK") startClock(); else stopClock();
+                        toggleDisplay(data.viewMode);
+                        togglePlateInfo(isPlateInfoComplete);
+                    } catch (e) {
+                        console.error('Error parsing SSE data', e);
+                        toggleDisplay("CLOCK")
+                    }
+                };
+
+                evtSource.onerror = (err) => {
+                    // console.error('SSE error:', err);
+                    toggleDisplay("CLOCK")
+                    setTimeout(connectSSE, 3000);
+                };
+            };
+
+            connectSSE();
+        });
+    </script>
+</body>
+</html>
